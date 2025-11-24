@@ -783,70 +783,302 @@ Avant de passer à la suite, vérifiez que vous maîtrisez :
 
 ---
 
-### 3.5 Modifications de documents (15 min)
+### 3.5 Exercices de modification de données (20 min)
+
+Maintenant que vous savez interroger les données, apprenons à les modifier ! Utilisez toujours la collection `employes` pour ces exercices.
+
+#### Exercice 11 : Mise à jour simple avec $set
+**Objectif :** Ajouter l'email "alice.martin@company.com" à l'employée Alice Martin
+
+**Ce que vous devez pratiquer :** Utilisation de `updateOne()` avec l'opérateur `$set`
+
+<details>
+<summary>💡 Solution</summary>
 
 ```javascript
-// 1. Mise à jour simple
 db.employes.updateOne(
-    {nom: "Martin", prenom: "Alice"},
-    {$set: {email: "alice.martin@company.com"}}
+    {nom: "Martin", prenom: "Alice"},        // Critère : qui modifier ?
+    {$set: {email: "alice.martin@company.com"}}  // Action : quoi modifier ?
+)
+
+// Vérifier le résultat
+db.employes.findOne({nom: "Martin", prenom: "Alice"})
+```
+
+**Explications :**
+- `updateOne()` modifie **un seul document** (le premier qui correspond)
+- `$set` ajoute un champ s'il n'existe pas, ou le modifie s'il existe déjà
+- Le champ `email` n'existait pas avant, MongoDB l'ajoute automatiquement
+- Équivalent SQL : `UPDATE employes SET email = '...' WHERE nom = 'Martin' AND prenom = 'Alice'`
+</details>
+
+---
+
+#### Exercice 12 : Incrémenter une valeur numérique
+**Objectif :** Augmenter le salaire de Diana Petit de 200€
+
+**Ce que vous devez pratiquer :** Utilisation de l'opérateur `$inc` pour incrémenter
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.updateOne(
+    {nom: "Petit"},
+    {$inc: {salaire: 200}}  // Ajoute 200 au salaire actuel
 )
 
 // Vérifier
-db.employes.findOne({nom: "Martin", prenom: "Alice"})
+db.employes.findOne({nom: "Petit"}, {nom: 1, prenom: 1, salaire: 1})
+```
 
-// 2. Incrémenter une valeur
-db.employes.updateOne(
-    {nom: "Petit"},
-    {$inc: {salaire: 200}}  // Augmentation
-)
+**Explications :**
+- `$inc` incrémente (ajoute à) une valeur numérique
+- Pour décrémenter, utiliser une valeur négative : `{$inc: {salaire: -100}}`
+- Plus efficace que lire la valeur, calculer, puis réécrire
+- ⚠️ Ne fonctionne qu'avec des nombres !
+</details>
 
-// 3. Ajouter dans un tableau
+---
+
+#### Exercice 13 : Ajouter un élément dans un tableau
+**Objectif :** Ajouter la compétence "Docker" à Eve Robert
+
+**Ce que vous devez pratiquer :** Utilisation de `$push` pour ajouter dans un tableau
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
 db.employes.updateOne(
-    {nom: "Robert"},
+    {nom: "Robert", prenom: "Eve"},
     {$push: {competences: "Docker"}}
 )
 
-// 4. Retirer d'un tableau
+// Vérifier
+db.employes.findOne({nom: "Robert"}, {nom: 1, competences: 1})
+```
+
+**Explications :**
+- `$push` ajoute un élément à la fin d'un tableau
+- Si le champ n'existe pas, MongoDB crée un tableau avec cet élément
+- Si le champ existe mais n'est pas un tableau, une erreur est levée
+- Pour ajouter plusieurs éléments d'un coup : `{$push: {competences: {$each: ["Docker", "Kubernetes"]}}}`
+</details>
+
+---
+
+#### Exercice 14 : Retirer un élément d'un tableau
+**Objectif :** Retirer la compétence "Python" de Eve Robert (elle préfère JavaScript maintenant !)
+
+**Ce que vous devez pratiquer :** Utilisation de `$pull` pour retirer d'un tableau
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
 db.employes.updateOne(
-    {nom: "Robert"},
+    {nom: "Robert", prenom: "Eve"},
     {$pull: {competences: "Python"}}
 )
 
-// 5. Mise à jour multiple
+// Vérifier
+db.employes.findOne({nom: "Robert"}, {nom: 1, competences: 1})
+```
+
+**Explications :**
+- `$pull` retire **toutes les occurrences** d'une valeur dans un tableau
+- Si la valeur n'existe pas dans le tableau, rien ne se passe (pas d'erreur)
+- Différence avec `$pop` : `$pop` retire le premier ou dernier élément, `$pull` retire une valeur spécifique
+</details>
+
+---
+
+#### Exercice 15 : Mise à jour multiple (plusieurs documents)
+**Objectif :** Ajouter un budget de formation de 1000€ à tous les employés du service "IT"
+
+**Ce que vous devez pratiquer :** Utilisation de `updateMany()` pour modifier plusieurs documents
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
 db.employes.updateMany(
-    {service: "IT"},
-    {$set: {budget_formation: 1000}}
+    {service: "IT"},                     // Critère : tous les IT
+    {$set: {budget_formation: 1000}}     // Action : ajouter le champ
 )
 
-// 6. Upsert (update ou insert)
+// Vérifier combien ont été modifiés
+db.employes.countDocuments({budget_formation: {$exists: true}})
+
+// Voir les résultats
+db.employes.find({service: "IT"}, {nom: 1, service: 1, budget_formation: 1})
+```
+
+**Explications :**
+- `updateMany()` modifie **tous les documents** qui correspondent aux critères
+- La réponse indique `matchedCount` (trouvés) et `modifiedCount` (modifiés)
+- ⚠️ Attention : sans critères `{}`, cela modifie TOUTE la collection !
+- Équivalent SQL : `UPDATE employes SET budget_formation = 1000 WHERE service = 'IT'`
+</details>
+
+---
+
+#### Exercice 16 : Upsert (update ou insert)
+**Objectif :** Créer un nouvel employé Kevin Nouveau (IT, 30 ans, 3300€) s'il n'existe pas déjà
+
+**Ce que vous devez pratiquer :** Utilisation de l'option `upsert` (update + insert)
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
 db.employes.updateOne(
-    {nom: "Nouveau", prenom: "Kevin"},
+    {nom: "Nouveau", prenom: "Kevin"},   // Critère de recherche
     {$set: {
         age: 30,
         service: "IT",
         salaire: 3300
     }},
-    {upsert: true}  // Créé si n'existe pas
+    {upsert: true}  // IMPORTANT : créer si n'existe pas
 )
 
-// 7. Replace (remplacement complet)
-db.employes.replaceOne(
-    {nom: "Thomas"},
+// Vérifier
+db.employes.findOne({nom: "Nouveau"})
+```
+
+**Explications :**
+- `upsert: true` = "update or insert"
+- Si le document existe → mise à jour
+- Si le document n'existe pas → création
+- Très utile pour éviter les doublons et simplifier le code
+- Sans `upsert`, si Kevin n'existe pas, rien ne se passe
+</details>
+
+---
+
+#### Exercice 17 : Supprimer un champ
+**Objectif :** Retirer le champ `stage` de tous les employés (nettoyage des données temporaires)
+
+**Ce que vous devez pratiquer :** Utilisation de `$unset` pour supprimer un champ
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.updateMany(
+    {},                      // Critères vides = tous les documents
+    {$unset: {stage: ""}}   // La valeur n'a pas d'importance, seul le nom du champ compte
+)
+
+// Vérifier qu'aucun employé n'a le champ "stage"
+db.employes.find({stage: {$exists: true}})
+```
+
+**Explications :**
+- `$unset` supprime complètement un champ d'un document
+- La valeur après le nom du champ (ici `""`) n'a aucune importance
+- Si le champ n'existe pas, rien ne se passe
+- Utile pour nettoyer des champs obsolètes ou temporaires
+</details>
+
+---
+
+#### Exercice 18 : Modifier plusieurs champs simultanément
+**Objectif :** Pour l'employé Charlie Durand, augmenter le salaire de 500€ ET ajouter le champ `derniere_promotion: new Date()`
+
+**Ce que vous devez pratiquer :** Combiner plusieurs opérateurs de modification
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.updateOne(
+    {nom: "Durand", prenom: "Charlie"},
     {
-        nom: "Thomas",
-        prenom: "Jack",
-        nouveau_poste: "Chef de projet",
-        salaire: 3500
+        $inc: {salaire: 500},
+        $set: {derniere_promotion: new Date()}
     }
 )
 
-// 8. Suppression de champ
-db.employes.updateMany(
-    {},
-    {$unset: {stage: ""}}
+// Vérifier
+db.employes.findOne(
+    {nom: "Durand"},
+    {nom: 1, prenom: 1, salaire: 1, derniere_promotion: 1}
 )
 ```
+
+**Explications :**
+- On peut combiner plusieurs opérateurs (`$inc`, `$set`, `$push`, etc.) dans une seule mise à jour
+- MongoDB applique toutes les modifications de manière atomique (tout ou rien)
+- Plus efficace qu'exécuter plusieurs `updateOne()` successifs
+</details>
+
+---
+
+#### 🎯 Exercice bonus : Mise à jour conditionnelle complexe
+**Objectif :** Augmenter de 10% le salaire de tous les employés IT qui gagnent moins de 4000€
+
+**Ce que vous devez pratiquer :** Combiner critères complexes et opérateurs mathématiques
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+// Méthode 1 : Augmentation en plusieurs étapes (simple mais limité)
+db.employes.updateMany(
+    {
+        service: "IT",
+        salaire: {$lt: 4000}
+    },
+    {$mul: {salaire: 1.1}}  // Multiplier par 1.1 = +10%
+)
+
+// Vérifier
+db.employes.find(
+    {service: "IT"},
+    {nom: 1, service: 1, salaire: 1}
+).sort({salaire: 1})
+```
+
+**Explications :**
+- `$mul` multiplie une valeur par un nombre
+- `$mul: {salaire: 1.1}` = augmentation de 10%
+- Combiné avec des critères précis : service IT ET salaire < 4000
+- ⚠️ Le résultat peut avoir des décimales : 3500 × 1.1 = 3850.0
+
+**Alternative avec arrondi (plus avancé) :**
+```javascript
+// Utiliser l'aggregation pipeline dans update (MongoDB 4.2+)
+db.employes.updateMany(
+    {
+        service: "IT",
+        salaire: {$lt: 4000}
+    },
+    [
+        {$set: {
+            salaire: {$round: [{$multiply: ["$salaire", 1.1]}, 2]}
+        }}
+    ]
+)
+```
+</details>
+
+---
+
+#### ✅ Auto-évaluation
+
+Avant de passer à la suite, vérifiez que vous maîtrisez :
+- [ ] Modifier un champ avec `$set`
+- [ ] Incrémenter/décrémenter avec `$inc` et `$mul`
+- [ ] Ajouter à un tableau avec `$push`
+- [ ] Retirer d'un tableau avec `$pull`
+- [ ] Supprimer un champ avec `$unset`
+- [ ] Utiliser `updateMany()` pour modifier plusieurs documents
+- [ ] Comprendre et utiliser l'option `upsert`
+- [ ] Combiner plusieurs opérateurs dans une seule mise à jour
+
+⚠️ **Rappel de sécurité :** `updateMany({}, ...)` sans critères modifie TOUTE la collection !
 
 ---
 
