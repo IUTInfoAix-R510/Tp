@@ -2831,224 +2831,400 @@ Avant de terminer la Phase 4, vérifiez que vous comprenez :
 
 ---
 
-## 🚀 Phase 5 : Mini-projet et validation (40 min) 
+## 🚀 Phase 5 : Mini-projet guidé - Système de gestion complet (40 min)
 
-### 5.1 Mini-projet : Système de notation et recommandations (15 min)
+Cette dernière phase vous permet de mettre en pratique **tout ce que vous avez appris** à travers un mini-projet réaliste : ajouter un système d'avis, de recommandations et un tableau de bord à la médiathèque.
+
+---
+
+### 5.1 Mission : Ajouter un système d'avis sur les livres (10 min)
+
+#### Étape 1 : Ajouter votre premier avis
+
+**Objectif :** Marie Dupont (M001) vient de lire "Le Petit Prince" et veut laisser un avis positif.
+
+**Ce que vous devez faire :**
+1. Ajouter un tableau `avis` dans le document du livre
+2. Chaque avis contient : membre_id, note (sur 5), commentaire, date
+
+**💪 À vous de jouer !** Essayez d'écrire la requête avant de regarder la solution.
+
+<details>
+<summary>💡 Solution</summary>
 
 ```javascript
-// Mission : Ajouter un système de notation et recommandations
-
-// 1. Ajouter des avis
 db.livres.updateOne(
     {isbn: "978-2-07-036822-8"},
     {$push: {
         avis: {
             membre_id: "M001",
             note: 5,
-            commentaire: "Un classique intemporel !",
+            commentaire: "Un classique intemporel ! Une lecture émouvante.",
             date: new Date(),
-            utile: 12  // Nombre de "j'aime"
+            utile: 0  // Nombre de "j'aime" (au début : 0)
         }
     }}
 )
 
-// 2. Recalculer la note moyenne
-db.livres.aggregate([
+// Vérifier que l'avis a été ajouté
+db.livres.findOne(
+    {isbn: "978-2-07-036822-8"},
+    {titre: 1, avis: 1}
+)
+```
+
+**Explications :**
+- `$push` ajoute un nouvel avis dans le tableau `avis`
+- Le tableau est créé automatiquement s'il n'existe pas encore
+- On embarque les avis dans le document livre (car < 100 avis attendus par livre)
+</details>
+
+---
+
+#### Étape 2 : Ajouter plusieurs avis
+
+**Objectif :** Ajouter 2 autres avis pour "Le Petit Prince" de membres différents.
+
+**💪 À vous de jouer !** Ajoutez :
+- Lucas Martin (M002) : note 4, commentaire "Très beau, mais un peu court"
+- Un troisième avis de votre choix avec un nouveau membre_id (ex: "M003")
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+// Avis de Lucas (M002)
+db.livres.updateOne(
+    {isbn: "978-2-07-036822-8"},
+    {$push: {
+        avis: {
+            membre_id: "M002",
+            note: 4,
+            commentaire: "Très beau, mais un peu court pour mon goût.",
+            date: new Date(),
+            utile: 2
+        }
+    }}
+)
+
+// Avis d'un troisième membre
+db.livres.updateOne(
+    {isbn: "978-2-07-036822-8"},
+    {$push: {
+        avis: {
+            membre_id: "M003",
+            note: 5,
+            commentaire: "À lire absolument ! Plein de sagesse.",
+            date: new Date(),
+            utile: 5
+        }
+    }}
+)
+
+// Vérifier tous les avis
+db.livres.findOne(
+    {isbn: "978-2-07-036822-8"},
+    {titre: 1, avis: 1, _id: 0}
+)
+```
+</details>
+
+---
+
+#### Étape 3 : Calculer la nouvelle note moyenne avec l'agrégation
+
+**Objectif :** Maintenant que le livre a plusieurs avis, calculer automatiquement la nouvelle note moyenne.
+
+**💪 À vous de jouer !** Utilisez l'agrégation pour :
+1. Filtrer le livre "Le Petit Prince"
+2. Dérouler le tableau `avis` avec `$unwind`
+3. Calculer la moyenne avec `$group` et `$avg`
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+let resultat = db.livres.aggregate([
     {$match: {isbn: "978-2-07-036822-8"}},
     {$unwind: "$avis"},
     {$group: {
         _id: "$isbn",
-        nouvelle_moyenne: {$avg: "$avis.note"},
+        titre: {$first: "$titre"},
+        ancienne_note: {$first: "$note_moyenne"},
+        nouvelle_note: {$avg: "$avis.note"},
         nombre_avis: {$sum: 1}
     }}
-])
+]).toArray()[0]
 
-// 3. Recommandations basées sur les préférences
+print(`=== Calcul de la nouvelle note ===`)
+print(`Livre : ${resultat.titre}`)
+print(`Ancienne note : ${resultat.ancienne_note}`)
+print(`Nouvelle note : ${resultat.nouvelle_note}`)
+print(`Basée sur ${resultat.nombre_avis} avis`)
+
+// Bonus : Mettre à jour la note moyenne dans le document
+db.livres.updateOne(
+    {isbn: "978-2-07-036822-8"},
+    {$set: {note_moyenne: resultat.nouvelle_note}}
+)
+```
+
+**Explications :**
+- `$unwind: "$avis"` : transforme chaque avis en document séparé
+- `$avg: "$avis.note"` : calcule la moyenne des notes
+- `$first` : récupère la première valeur (utile pour garder le titre)
+- En production, on mettrait à jour automatiquement `note_moyenne` après chaque avis
+</details>
+
+---
+
+### 5.2 Mission : Créer un système de recommandations (10 min)
+
+#### Étape 4 : Recommander des livres selon les préférences
+
+**Objectif :** Créer une fonction qui recommande des livres à un membre en fonction de ses préférences (catégories favorites).
+
+**💪 À vous de jouer !** Créez une fonction `recommander(membre_id)` qui :
+1. Récupère le membre et ses préférences
+2. Trouve les livres correspondant à ses catégories préférées
+3. Filtre uniquement les livres avec une note ≥ 4.0
+4. Trie par note décroissante
+5. Limite à 5 résultats
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
 function recommander(membre_id) {
-    // Récupérer les préférences du membre
-    let membre = db.membres.findOne({_id: membre_id});
-    
-    if (!membre || !membre.preferences) {
-        return [];
+    // 1. Récupérer le membre
+    let membre = db.membres.findOne({_id: membre_id})
+
+    if (!membre) {
+        print(`❌ Membre ${membre_id} introuvable`)
+        return []
     }
-    
-    // Trouver les livres correspondants
-    return db.livres.find({
+
+    if (!membre.preferences || membre.preferences.length === 0) {
+        print(`⚠️ ${membre.prenom} n'a pas de préférences définies`)
+        return []
+    }
+
+    print(`=== Recommandations pour ${membre.prenom} ${membre.nom} ===`)
+    print(`Préférences : ${membre.preferences.join(", ")}`)
+    print("")
+
+    // 2. Trouver les livres correspondants
+    let livres = db.livres.find({
         categories: {$in: membre.preferences},
         note_moyenne: {$gte: 4.0}
     })
     .sort({note_moyenne: -1, nombre_emprunts_total: -1})
     .limit(5)
-    .toArray();
+    .toArray()
+
+    // 3. Afficher les recommandations
+    livres.forEach((livre, index) => {
+        print(`${index + 1}. ${livre.titre} - ${livre.auteur.prenom} ${livre.auteur.nom}`)
+        print(`   Note : ${livre.note_moyenne}/5 | Emprunts : ${livre.nombre_emprunts_total}`)
+        print(`   Catégories : ${livre.categories.join(", ")}`)
+        print("")
+    })
+
+    return livres
 }
 
-// Test
-let recommendations = recommander("M001");
-recommendations.forEach(livre => {
-    print(`Recommandé : ${livre.titre} (${livre.note_moyenne}/5)`);
-});
+// Tester la fonction
+recommander("M001")  // Marie aime Fiction et Science-Fiction
+recommander("M002")  // Lucas aime Fantasy et Jeunesse
+```
 
-// 4. Dashboard statistiques
-db.livres.aggregate([
-    // Statistiques globales
+**Explications :**
+- `$in: membre.preferences` : cherche les livres dont au moins une catégorie match
+- Double tri : d'abord par note, puis par popularité
+- `.toArray()` : convertit le curseur en tableau JavaScript
+</details>
+
+---
+
+#### Étape 5 : Améliorer les recommandations (exclusion des déjà lus)
+
+**Objectif :** Améliorer la fonction pour ne PAS recommander les livres que le membre a déjà empruntés.
+
+**💪 À vous de jouer !** Modifiez la fonction pour ajouter un filtre `$nin` (not in) qui exclut les livres dont l'ISBN est dans `emprunts_en_cours` du membre.
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+function recommanderAmeliore(membre_id) {
+    let membre = db.membres.findOne({_id: membre_id})
+
+    if (!membre || !membre.preferences) {
+        print("Membre introuvable ou sans préférences")
+        return []
+    }
+
+    // Extraire les ISBN des livres déjà empruntés
+    let deja_empruntes = membre.emprunts_en_cours.map(e => e.livre_isbn)
+
+    print(`=== Recommandations (hors déjà lus) pour ${membre.prenom} ===`)
+    print(`Livres en cours d'emprunt : ${deja_empruntes.length}`)
+    print("")
+
+    // Recommander en excluant les déjà empruntés
+    let livres = db.livres.find({
+        categories: {$in: membre.preferences},
+        note_moyenne: {$gte: 4.0},
+        isbn: {$nin: deja_empruntes}  // ← Exclusion !
+    })
+    .sort({note_moyenne: -1})
+    .limit(5)
+    .toArray()
+
+    livres.forEach((livre, index) => {
+        print(`${index + 1}. ${livre.titre} (${livre.note_moyenne}/5)`)
+    })
+
+    return livres
+}
+
+// Tester
+recommanderAmeliore("M001")
+```
+
+**Explications :**
+- `.map(e => e.livre_isbn)` : extrait les ISBN du tableau d'emprunts
+- `$nin` : "not in" = n'est pas dans la liste
+- Permet d'éviter de recommander des livres déjà lus
+</details>
+
+---
+
+### 5.3 Mission : Créer un tableau de bord de statistiques (10 min)
+
+#### Étape 6 : Créer un dashboard avec plusieurs statistiques
+
+**Objectif :** Utiliser `$facet` pour créer un tableau de bord complet avec plusieurs statistiques en **une seule requête**.
+
+**💪 À vous de jouer !** Créez une agrégation avec `$facet` qui calcule :
+1. Nombre total de livres
+2. Nombre total d'exemplaires
+3. Top 3 des catégories populaires
+4. Le livre le plus emprunté
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+let dashboard = db.livres.aggregate([
     {$facet: {
-        total_livres: [{$count: "count"}],
-        
+        // Statistique 1 : Total de livres
+        total_livres: [
+            {$count: "count"}
+        ],
+
+        // Statistique 2 : Total d'exemplaires
         total_exemplaires: [
             {$unwind: "$exemplaires"},
             {$count: "count"}
         ],
-        
-        exemplaires_disponibles: [
+
+        // Statistique 3 : Exemplaires disponibles vs empruntés
+        disponibilite: [
             {$unwind: "$exemplaires"},
-            {$match: {"exemplaires.disponible": true}},
-            {$count: "count"}
+            {$group: {
+                _id: null,
+                total: {$sum: 1},
+                disponibles: {
+                    $sum: {$cond: ["$exemplaires.disponible", 1, 0]}
+                },
+                empruntes: {
+                    $sum: {$cond: ["$exemplaires.disponible", 0, 1]}
+                }
+            }}
         ],
-        
+
+        // Statistique 4 : Top 3 des catégories
         categories_populaires: [
             {$unwind: "$categories"},
             {$group: {
                 _id: "$categories",
-                count: {$sum: 1}
+                nombre_livres: {$sum: 1}
             }},
-            {$sort: {count: -1}},
-            {$limit: 5}
+            {$sort: {nombre_livres: -1}},
+            {$limit: 3}
         ],
-        
-        livres_populaires: [
+
+        // Statistique 5 : Livre le plus populaire
+        livre_star: [
             {$sort: {nombre_emprunts_total: -1}},
-            {$limit: 3},
-            {$project: {titre: 1, nombre_emprunts_total: 1}}
+            {$limit: 1},
+            {$project: {
+                titre: 1,
+                auteur: 1,
+                nombre_emprunts_total: 1,
+                note_moyenne: 1,
+                _id: 0
+            }}
         ]
     }}
-])
+]).toArray()[0]
+
+// Affichage formaté du dashboard
+print("╔═══════════════════════════════════════════════════════════╗")
+print("║       📊 TABLEAU DE BORD - MÉDIATHÈQUE BUT3              ║")
+print("╚═══════════════════════════════════════════════════════════╝")
+print("")
+
+print(`📚 Livres au catalogue : ${dashboard.total_livres[0].count}`)
+print(`📖 Exemplaires physiques : ${dashboard.total_exemplaires[0].count}`)
+print("")
+
+let dispo = dashboard.disponibilite[0]
+print(`✅ Disponibles : ${dispo.disponibles} (${((dispo.disponibles/dispo.total)*100).toFixed(1)}%)`)
+print(`📤 Empruntés : ${dispo.empruntes} (${((dispo.empruntes/dispo.total)*100).toFixed(1)}%)`)
+print("")
+
+print("🏆 Top 3 des catégories :")
+dashboard.categories_populaires.forEach((cat, index) => {
+    print(`   ${index + 1}. ${cat._id} (${cat.nombre_livres} livres)`)
+})
+print("")
+
+let star = dashboard.livre_star[0]
+print(`⭐ Livre star : "${star.titre}"`)
+print(`   de ${star.auteur.prenom} ${star.auteur.nom}`)
+print(`   ${star.nombre_emprunts_total} emprunts | Note : ${star.note_moyenne}/5`)
 ```
 
-### 5.2 Exercices de validation
-
-```javascript
-// EXERCICE 1 : Créer une collection "evenements" pour la médiathèque
-// Modéliser : conférences, ateliers lecture, expositions
-// Inclure : date, intervenant, participants (max 30), inscriptions
-
-// Votre solution :
-
-
-// EXERCICE 2 : Requête complexe
-// Trouver tous les livres Fantasy disponibles,
-// publiés après 1990, avec une note > 4
-// Trier par nombre d'emprunts décroissant
-
-// Votre requête :
-
-
-// EXERCICE 3 : Fonction d'analyse
-// Créer une fonction qui calcule le taux d'occupation
-// de la médiathèque (% de livres empruntés)
-
-// Votre fonction :
-
-
-// EXERCICE 4 : Optimisation
-// Identifier les index nécessaires pour optimiser :
-// - Recherche par ISBN
-// - Recherche par catégorie
-// - Recherche par disponibilité
-
-// Vos commandes :
-
-```
+**Explications :**
+- `$facet` : exécute plusieurs pipelines en parallèle sur les mêmes données
+- Chaque clé de `$facet` devient un champ dans le résultat
+- Une seule requête remplace 5 requêtes séparées !
+- Très performant pour les dashboards
+</details>
 
 ---
 
-### 📝 Corrigés des exercices
+### 5.4 Exercices de validation autonome (10 min)
+
+Ces exercices finaux vous permettent de vérifier que vous maîtrisez l'ensemble des concepts. **Essayez de les faire sans regarder les solutions !**
+
+#### Exercice 47 : Trouver les livres populaires disponibles
+
+**Objectif :** Créer une requête qui trouve les livres Fantasy avec une note > 4.5, publiés après 1990, qui ont au moins un exemplaire disponible, triés par popularité.
+
+**💪 À vous de jouer !**
 
 <details>
-<summary>💡 Corrigé Exercice 1 : Collection "evenements"</summary>
-
-```javascript
-db.evenements.insertMany([
-    {
-        type: "conference",
-        titre: "La littérature française au XXIe siècle",
-        date: new Date("2024-02-15T18:00:00"),
-        duree_minutes: 90,
-        lieu: "Salle polyvalente",
-        intervenant: {
-            nom: "Dupont",
-            prenom: "Marie",
-            bio: "Professeure de littérature à l'université",
-            contact: "marie.dupont@univ.fr"
-        },
-        capacite_max: 30,
-        inscriptions: [
-            {
-                membre_id: "M001",
-                date_inscription: new Date("2024-01-20")
-            },
-            {
-                membre_id: "M002",
-                date_inscription: new Date("2024-01-22")
-            }
-        ],
-        nombre_inscrits: 2,
-        statut: "ouvert",  // ouvert, complet, annulé, terminé
-        theme: ["littérature", "culture"]
-    },
-    {
-        type: "atelier",
-        titre: "Initiation à l'écriture créative",
-        date: new Date("2024-02-20T14:00:00"),
-        duree_minutes: 120,
-        lieu: "Salle 3",
-        intervenant: {
-            nom: "Martin",
-            prenom: "Lucas",
-            bio: "Écrivain et formateur"
-        },
-        capacite_max: 15,
-        inscriptions: [],
-        nombre_inscrits: 0,
-        statut: "ouvert",
-        materiel_requis: ["Cahier", "Stylo"],
-        theme: ["écriture", "créativité"]
-    },
-    {
-        type: "exposition",
-        titre: "Illustrations de contes classiques",
-        date_debut: new Date("2024-03-01"),
-        date_fin: new Date("2024-03-31"),
-        lieu: "Hall principal",
-        artiste: {
-            nom: "Bernard",
-            prenom: "Sophie",
-            site_web: "www.sophie-illustre.fr"
-        },
-        acces_libre: true,
-        theme: ["art", "jeunesse", "illustration"]
-    }
-])
-
-// Vérification
-db.evenements.find()
-```
-
-**Points clés de la modélisation :**
-- Différents types d'événements dans la même collection (flexibilité)
-- Objets imbriqués pour les informations de l'intervenant
-- Tableau d'inscriptions embarqué (jusqu'à 30 max)
-- Champs optionnels selon le type (materiel_requis, date_fin, etc.)
-</details>
-
-<details>
-<summary>💡 Corrigé Exercice 2 : Requête complexe</summary>
+<summary>💡 Solution</summary>
 
 ```javascript
 db.livres.find(
     {
         categories: "Fantasy",
         "publication.annee": {$gt: 1990},
-        note_moyenne: {$gt: 4},
+        note_moyenne: {$gt: 4.5},
         "exemplaires.disponible": true
     },
     {
@@ -3056,176 +3232,306 @@ db.livres.find(
         "auteur.nom": 1,
         "auteur.prenom": 1,
         note_moyenne: 1,
-        nombre_emprunts_total: 1
+        nombre_emprunts_total: 1,
+        _id: 0
     }
 ).sort({nombre_emprunts_total: -1})
-
-// ⚠️ Note : Cette requête vérifie qu'AU MOINS UN exemplaire est disponible
-// Si vous voulez afficher SEULEMENT les exemplaires disponibles,
-// il faudrait utiliser l'agrégation avec $filter
 ```
 
-**Explication :**
-- `categories: "Fantasy"` : MongoDB cherche "Fantasy" dans le tableau
-- `{$gt: 1990}` : Strictement supérieur (après 1990)
-- `{$gt: 4}` : Note strictement supérieure à 4
-- `sort({...: -1})` : -1 = décroissant, 1 = croissant
+**Ce que ça révise :**
+- Critères multiples (AND implicite)
+- Notation pointée sur objets et tableaux
+- Projection
+- Tri
 </details>
 
+---
+
+#### Exercice 48 : Créer une fonction de calcul du taux d'occupation
+
+**Objectif :** Écrire une fonction qui affiche quel pourcentage des exemplaires est actuellement emprunté.
+
+**💪 À vous de jouer !**
+
 <details>
-<summary>💡 Corrigé Exercice 3 : Fonction taux d'occupation</summary>
+<summary>💡 Solution</summary>
 
 ```javascript
-function calculerTauxOccupation() {
-    // Méthode 1 : Avec agrégation (recommandée)
+function tauxOccupation() {
     let stats = db.livres.aggregate([
         {$unwind: "$exemplaires"},
         {$group: {
             _id: null,
             total: {$sum: 1},
             empruntes: {
-                $sum: {
-                    $cond: [{$eq: ["$exemplaires.disponible", false]}, 1, 0]
-                }
+                $sum: {$cond: ["$exemplaires.disponible", 0, 1]}
             }
         }},
         {$project: {
+            _id: 0,
             total: 1,
             empruntes: 1,
-            taux_occupation: {
+            taux: {
                 $multiply: [
                     {$divide: ["$empruntes", "$total"]},
                     100
                 ]
             }
         }}
-    ]).toArray()[0];
+    ]).toArray()[0]
 
-    print(`=== Statistiques de la médiathèque ===`);
-    print(`Total exemplaires : ${stats.total}`);
-    print(`Exemplaires empruntés : ${stats.empruntes}`);
-    print(`Taux d'occupation : ${stats.taux_occupation.toFixed(2)}%`);
+    print(`📊 Taux d'occupation : ${stats.taux.toFixed(1)}%`)
+    print(`   (${stats.empruntes} empruntés sur ${stats.total} exemplaires)`)
 
-    return stats;
+    return stats
 }
 
-// Test de la fonction
-calculerTauxOccupation();
-
-// Méthode 2 : Plus simple mais moins performante
-function calculerTauxOccupationSimple() {
-    let total = 0;
-    let empruntes = 0;
-
-    db.livres.find().forEach(livre => {
-        livre.exemplaires.forEach(ex => {
-            total++;
-            if (!ex.disponible) empruntes++;
-        });
-    });
-
-    let taux = (empruntes / total) * 100;
-    print(`Taux d'occupation : ${taux.toFixed(2)}%`);
-    return taux;
-}
+tauxOccupation()
 ```
 
-**Points clés :**
-- `$unwind` : "Déroule" le tableau exemplaires (1 doc = 1 exemplaire)
-- `$cond` : Condition if/else dans l'agrégation
-- La méthode 1 (agrégation) est plus performante pour de gros volumes
+**Ce que ça révise :**
+- Agrégation avec `$unwind`, `$group`, `$project`
+- `$cond` pour conditions
+- Calculs mathématiques
+- Fonctions JavaScript
 </details>
 
+---
+
+#### Exercice 49 : Créer des index d'optimisation
+
+**Objectif :** Identifier et créer les index nécessaires pour optimiser les requêtes fréquentes de la médiathèque.
+
+**💪 À vous de jouer !** Créez des index pour :
+1. Recherche par ISBN (très fréquente)
+2. Recherche par catégorie
+3. Recherche par disponibilité
+4. Tri par note moyenne
+
 <details>
-<summary>💡 Corrigé Exercice 4 : Index d'optimisation</summary>
+<summary>💡 Solution</summary>
 
 ```javascript
-// 1. Index sur ISBN (recherche exacte très fréquente)
-db.livres.createIndex({isbn: 1})
-// Justification : L'ISBN est unique et souvent utilisé pour identifier un livre
+// 1. Index unique sur ISBN (recherche exacte)
+db.livres.createIndex({isbn: 1}, {unique: true})
 
 // 2. Index sur les catégories (recherches fréquentes)
 db.livres.createIndex({categories: 1})
-// Justification : Recherches par genre (Fantasy, Science-Fiction, etc.)
 
-// 3. Index sur la disponibilité des exemplaires
+// 3. Index sur la disponibilité (requête très fréquente)
 db.livres.createIndex({"exemplaires.disponible": 1})
-// Justification : Requête fréquente pour trouver les livres disponibles
 
-// 4. Index composé pour les recherches combinées
+// 4. Index composé : catégorie + note (recherche + tri)
 db.livres.createIndex({categories: 1, note_moyenne: -1})
-// Justification : Rechercher dans une catégorie et trier par note
-
-// 5. Index sur les membres pour les emprunts
-db.membres.createIndex({_id: 1})  // Existe déjà par défaut
-db.membres.createIndex({"emprunts_en_cours.livre_isbn": 1})
-// Justification : Trouver rapidement les emprunts d'un membre
 
 // Vérifier les index créés
 db.livres.getIndexes()
-db.membres.getIndexes()
 
-// Analyser les performances d'une requête avec explain()
+// Analyser les performances d'une requête
 db.livres.find({categories: "Fantasy"}).explain("executionStats")
 ```
 
-**Principes d'indexation :**
-- Indexer les champs utilisés dans `find()` et `sort()`
-- Index composés pour les requêtes combinées fréquentes
-- Attention : trop d'index ralentit les écritures (INSERT/UPDATE)
-- `explain()` permet de vérifier qu'un index est bien utilisé
+**Ce que ça révise :**
+- Création d'index simples et composés
+- Index unique
+- Vérification avec `getIndexes()`
+- Analyse des performances avec `explain()`
+
+**Principe :** Indexer les champs utilisés dans `find()` et `sort()`, mais attention : trop d'index ralentit les écritures !
 </details>
-
-```
-
----
 
 ## ✅ Checklist de fin de séance
 
 ### Compétences acquises
-- [ ] Je sais me connecter à MongoDB Atlas
-- [ ] Je comprends la différence SQL vs NoSQL
-- [ ] Je maîtrise insertOne et insertMany
-- [ ] Je sais faire des find avec critères
-- [ ] Je peux modifier des documents (set, inc, push)
-- [ ] Je comprends l'embedding de documents
-- [ ] Je sais créer des fonctions métier
-- [ ] Je peux faire des agrégations simples
 
-### Points clés à retenir
-1. **Flexibilité du schéma** : Les documents peuvent avoir des structures différentes
-2. **Embedding vs Référence** : Privilégier l'embedding pour les données lues ensemble
-3. **ObjectId** : Contient la date de création
-4. **Pas de JOIN** : Toute l'info dans le document ou via agrégation
-5. **Types BSON** : Plus riches que JSON (Date, ObjectId, Decimal128...)
+À la fin de cette séance de 4 heures, vous devriez être capable de :
 
-### Auto-évaluation rapide
+**Concepts fondamentaux**
+- [ ] Expliquer les différences entre SQL et NoSQL
+- [ ] Justifier quand utiliser MongoDB plutôt qu'une BDD relationnelle
+- [ ] Comprendre le concept de schéma flexible
+- [ ] Distinguer embedding et références
+
+**Opérations CRUD**
+- [ ] Créer des documents avec `insertOne()` et `insertMany()`
+- [ ] Interroger avec `find()`, critères, projections, tri, limite
+- [ ] Modifier avec `updateOne()`/`updateMany()` et les opérateurs `$set`, `$inc`, `$push`, `$pull`
+- [ ] Supprimer avec `deleteOne()`/`deleteMany()`
+
+**Documents complexes**
+- [ ] Utiliser la notation pointée (`"auteur.nom"`, `"exemplaires.disponible"`)
+- [ ] Manipuler des tableaux d'objets
+- [ ] Utiliser l'opérateur positionnel `$` pour modifier un élément précis
+- [ ] Travailler avec des documents à 3 niveaux d'imbrication
+
+**Agrégation**
+- [ ] Comprendre le concept de pipeline
+- [ ] Utiliser `$match`, `$project`, `$group`, `$sort`, `$limit`
+- [ ] Dérouler un tableau avec `$unwind`
+- [ ] Calculer des statistiques avec `$sum`, `$avg`, `$count`
+- [ ] Utiliser `$facet` pour des dashboards
+
+**Outils**
+- [ ] Se connecter à MongoDB Atlas
+- [ ] Utiliser MongoDB Compass
+- [ ] Écrire des requêtes dans mongosh
+- [ ] Créer des index d'optimisation
+
+---
+
+### 💡 Points clés à retenir
+
+1. **Flexibilité du schéma** : Les documents peuvent avoir des structures différentes dans la même collection
+2. **Embedding vs Référence** : Privilégier l'embedding pour les données lues ensemble (règle : < 100 éléments)
+3. **ObjectId** : Contient automatiquement la date de création
+4. **Pas de JOIN** : Toute l'info est dans le document ou accessible via agrégation `$lookup`
+5. **Types BSON** : Plus riches que JSON (Date, ObjectId, Decimal128, etc.)
+6. **Notation pointée** : Guillemets obligatoires (`"champ.sous_champ"`)
+7. **Opérateur `$`** : Représente l'élément du tableau qui a matché dans les updates
+8. **Agrégation = pipeline** : Les données passent par plusieurs étapes de transformation
+9. **Index = performance** : Indexer les champs utilisés dans `find()` et `sort()`
+
+---
+
+### 🎯 Auto-évaluation rapide
+
+Testez-vous en écrivant ces requêtes **sans aide** :
+
 ```javascript
-// Testez-vous : Écrivez ces requêtes sans aide
+// 1. Insérer un nouveau livre avec auteur imbriqué et 2 exemplaires
 
-// 1. Insérer un nouveau membre
+// 2. Trouver les livres de George Orwell (notation pointée)
 
-// 2. Trouver les livres de George Orwell
+// 3. Augmenter la note moyenne d'un livre de 0.5
 
-// 3. Augmenter la note d'un livre
+// 4. Ajouter un exemplaire à un livre existant ($push)
 
-// 4. Compter les livres par catégorie
+// 5. Compter les livres par catégorie (agrégation)
 
-// 5. Lister les emprunts en retard
+// 6. Lister les emprunts en retard (comparaison de dates)
 ```
+
+<details>
+<summary>💡 Solutions</summary>
+
+```javascript
+// 1. Insérer un nouveau livre avec auteur imbriqué et 2 exemplaires
+db.livres.insertOne({
+    isbn: "978-2-07-123456-7",
+    titre: "Fondation",
+    auteur: {
+        nom: "Asimov",
+        prenom: "Isaac",
+        nationalite: "Américaine"
+    },
+    publication: {
+        editeur: "Gallimard",
+        annee: 1951
+    },
+    exemplaires: [
+        {code: "FON-001", etat: "Bon", disponible: true, emplacement: "Rayon SF"},
+        {code: "FON-002", etat: "Neuf", disponible: true, emplacement: "Rayon SF"}
+    ],
+    categories: ["Science-Fiction"],
+    note_moyenne: 4.7,
+    nombre_emprunts_total: 0
+})
+
+// 2. Trouver les livres de George Orwell (notation pointée)
+db.livres.find({"auteur.nom": "Orwell"})
+
+// 3. Augmenter la note moyenne d'un livre de 0.5
+db.livres.updateOne(
+    {titre: "1984"},
+    {$inc: {note_moyenne: 0.5}}
+)
+
+// 4. Ajouter un exemplaire à un livre existant ($push)
+db.livres.updateOne(
+    {isbn: "978-2-07-036822-8"},
+    {$push: {
+        exemplaires: {
+            code: "LPP-005",
+            etat: "Neuf",
+            disponible: true,
+            emplacement: "Rayon A3"
+        }
+    }}
+)
+
+// 5. Compter les livres par catégorie (agrégation)
+db.livres.aggregate([
+    {$unwind: "$categories"},
+    {$group: {
+        _id: "$categories",
+        nombre: {$sum: 1}
+    }},
+    {$sort: {nombre: -1}}
+])
+
+// 6. Lister les emprunts en retard (comparaison de dates)
+db.livres.find({
+    "exemplaires.emprunt_actuel.date_retour_prevue": {$lt: new Date()}
+},
+{
+    titre: 1,
+    "exemplaires.emprunt_actuel": 1
+})
+```
+</details>
 
 ---
 
 ## 📚 Pour préparer la séance 2
 
+### Ce que vous allez découvrir
+
+La **Séance 2** approfondira les concepts vus aujourd'hui :
+- **Agrégation avancée** : `$lookup` (JOIN MongoDB), `$facet`, pipelines complexes
+- **Modélisation avancée** : Références entre collections, dénormalisation
+- **Transactions** : ACID dans MongoDB (multi-documents)
+- **Géospatial** : Requêtes sur des coordonnées GPS
+- **Projet SteamCity** : Modéliser et gérer des données IoT temps réel
+
 ### Ressources complémentaires
-- MongoDB University : M001 MongoDB Basics (gratuit)
-- Documentation : https://docs.mongodb.com/manual/crud/
-- Playground : https://mongoplayground.net/
+
+Pour aller plus loin avant la séance 2 :
+
+**Documentation officielle**
+- [MongoDB CRUD Operations](https://docs.mongodb.com/manual/crud/)
+- [Aggregation Pipeline](https://docs.mongodb.com/manual/aggregation/)
+- [Data Modeling Introduction](https://docs.mongodb.com/manual/core/data-modeling-introduction/)
+
+**Cours gratuits MongoDB University**
+- M001 : MongoDB Basics (5 heures, certificat gratuit)
+- M121 : The MongoDB Aggregation Framework
+
+**Outils pratiques**
+- [MongoDB Playground](https://mongoplayground.net/) : Tester des requêtes en ligne
+- [Studio 3T](https://studio3t.com/) : IDE avancé pour MongoDB (gratuit pour étudiants)
 
 ### Défis optionnels
-1. Modéliser votre collection de films/séries préférés
-2. Créer un système de gestion de notes BUT
-3. Implémenter un mini réseau social (users, posts, likes)
 
+Si vous voulez pratiquer d'ici la prochaine séance :
 
+1. **Modéliser votre bibliothèque personnelle**
+   - Collection de films/séries avec acteurs, réalisateurs, avis
+   - Implémenter un système de playlists
+
+2. **Créer un système de gestion de notes BUT**
+   - Étudiants, modules, notes, absences
+   - Calculer moyennes par UE avec agrégation
+
+3. **Mini réseau social**
+   - Users, posts, likes, commentaires
+   - Timeline avec requêtes complexes
+
+---
+
+**🎉 Félicitations !** Vous avez terminé la Séance 1 sur MongoDB. Vous maîtrisez maintenant les fondamentaux du NoSQL et êtes prêts pour des concepts plus avancés !
+
+**Questions ?** N'hésitez pas à créer une [issue sur GitHub](https://github.com/IUTInfoAix-R510/Cours/issues) ou à contacter votre enseignant.
+
+---
+
+*Document généré pour le module R5.Real.10 - IUT d'Aix-Marseille - BUT Informatique 3ème année*
