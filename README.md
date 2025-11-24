@@ -38,10 +38,10 @@ Cette séance pose les fondations pour votre projet fil rouge **SteamCity.io**, 
 | 0h00-0h30 | 30 min | Cours : Du relationnel au NoSQL |
 | 0h30-1h15 | 45 min | Installation et configuration Atlas |
 | 1h15-1h25 | 10 min | **Pause** |
-| 1h25-2h20 | 55 min | Découverte pratique MongoDB |
-| 2h20-3h20 | 60 min | CRUD complet guidé |
-| 3h20-3h30 | 10 min | **Pause** |
-| 3h30-4h00 | 30 min | Mini-projet et validation |
+| 1h25-2h10 | 45 min | Découverte pratique + Exercices interrogation |
+| 2h10-3h10 | 60 min | CRUD complet guidé |
+| 3h10-3h20 | 10 min | **Pause** |
+| 3h20-4h00 | 40 min | Mini-projet et validation |
 
 ---
 
@@ -526,7 +526,264 @@ db.employes.find({manager: {$exists: true}})
 db.employes.find({competences: "MongoDB"})
 ```
 
-### 3.4 Modifications de documents (15 min)
+---
+
+### 3.4 Exercices d'interrogation de données (20 min)
+
+Maintenant que vous avez vu les différentes syntaxes, testez votre compréhension avec ces exercices pratiques sur la collection `employes`.
+
+#### Exercice 1 : Requête simple avec égalité
+**Objectif :** Trouver tous les employés du service "Marketing"
+
+**Ce que vous devez pratiquer :** Requête simple avec un critère d'égalité
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find({service: "Marketing"})
+```
+
+**Explications :**
+- Syntaxe de base : `find({champ: valeur})`
+- Retourne tous les documents où `service` vaut exactement "Marketing"
+</details>
+
+---
+
+#### Exercice 2 : Requête avec opérateur de comparaison
+**Objectif :** Trouver tous les employés de moins de 30 ans
+
+**Ce que vous devez pratiquer :** Utilisation de l'opérateur `$lt` (less than)
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find({age: {$lt: 30}})
+```
+
+**Explications :**
+- `$lt: 30` signifie "strictement inférieur à 30"
+- Autres opérateurs utiles :
+  - `$gt` : greater than (>)
+  - `$lte` : less than or equal (≤)
+  - `$gte` : greater than or equal (≥)
+  - `$ne` : not equal (≠)
+</details>
+
+---
+
+#### Exercice 3 : Requête avec plusieurs critères (AND)
+**Objectif :** Trouver les employés du service "IT" qui gagnent plus de 3500€
+
+**Ce que vous devez pratiquer :** Combiner plusieurs critères (AND implicite)
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find({
+    service: "IT",
+    salaire: {$gt: 3500}
+})
+```
+
+**Explications :**
+- Virgule entre les critères = AND logique
+- Équivalent SQL : `WHERE service = 'IT' AND salaire > 3500`
+</details>
+
+---
+
+#### Exercice 4 : Projection de champs
+**Objectif :** Afficher uniquement le nom, prénom et salaire de tous les employés (sans l'_id)
+
+**Ce que vous devez pratiquer :** Sélection de champs spécifiques (projection)
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find(
+    {},                                    // Critères vides = tous les documents
+    {nom: 1, prenom: 1, salaire: 1, _id: 0}  // Projection
+)
+```
+
+**Explications :**
+- `1` = inclure le champ
+- `0` = exclure le champ
+- Par défaut, `_id` est toujours inclus, il faut le mettre explicitement à 0 pour l'exclure
+- Équivalent SQL : `SELECT nom, prenom, salaire FROM employes`
+</details>
+
+---
+
+#### Exercice 5 : Tri des résultats
+**Objectif :** Afficher tous les employés triés par âge croissant
+
+**Ce que vous devez pratiquer :** Utilisation de `.sort()`
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find().sort({age: 1})
+```
+
+**Explications :**
+- `sort({champ: 1})` = tri croissant (ascendant)
+- `sort({champ: -1})` = tri décroissant (descendant)
+- Équivalent SQL : `ORDER BY age ASC`
+</details>
+
+---
+
+#### Exercice 6 : Limitation du nombre de résultats
+**Objectif :** Afficher les 3 employés les mieux payés
+
+**Ce que vous devez pratiquer :** Combinaison de `.sort()` et `.limit()`
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find()
+    .sort({salaire: -1})  // Tri décroissant
+    .limit(3)              // Garder les 3 premiers
+```
+
+**Explications :**
+- Ordre important : trier d'abord, limiter ensuite
+- Équivalent SQL : `ORDER BY salaire DESC LIMIT 3`
+</details>
+
+---
+
+#### Exercice 7 : Compter des documents
+**Objectif :** Combien d'employés travaillent au service "RH" ?
+
+**Ce que vous devez pratiquer :** Utilisation de `countDocuments()`
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.countDocuments({service: "RH"})
+```
+
+**Explications :**
+- `countDocuments()` retourne un nombre, pas des documents
+- Équivalent SQL : `SELECT COUNT(*) FROM employes WHERE service = 'RH'`
+</details>
+
+---
+
+#### Exercice 8 : Valeurs distinctes
+**Objectif :** Lister tous les services existants (sans doublon)
+
+**Ce que vous devez pratiquer :** Utilisation de `distinct()`
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.distinct("service")
+```
+
+**Explications :**
+- `distinct("champ")` retourne un tableau de valeurs uniques
+- Équivalent SQL : `SELECT DISTINCT service FROM employes`
+</details>
+
+---
+
+#### Exercice 9 : Requête sur champ optionnel
+**Objectif :** Trouver tous les managers (employés qui ont le champ `manager` défini)
+
+**Ce que vous devez pratiquer :** Utilisation de `$exists`
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find({manager: {$exists: true}})
+
+// Ou plus strict (champ existe ET vaut true) :
+db.employes.find({manager: true})
+```
+
+**Explications :**
+- `$exists: true` vérifie que le champ existe dans le document
+- `$exists: false` vérifie que le champ n'existe PAS
+- Utile car MongoDB a un schéma flexible : tous les documents n'ont pas les mêmes champs
+</details>
+
+---
+
+#### Exercice 10 : Requête sur un tableau
+**Objectif :** Trouver tous les employés qui ont la compétence "MongoDB"
+
+**Ce que vous devez pratiquer :** Requête dans un tableau
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find({competences: "MongoDB"})
+```
+
+**Explications :**
+- MongoDB cherche automatiquement dans les tableaux
+- Cette requête trouve tous les documents où le tableau `competences` contient "MongoDB"
+- ⚠️ Attention : certains employés n'ont pas de champ `competences` du tout, ils ne seront pas retournés
+</details>
+
+---
+
+#### 🎯 Exercice bonus : Requête complexe combinée
+**Objectif :** Trouver les 2 employés les plus jeunes du service "IT", en affichant uniquement leur nom complet et leur âge
+
+**Ce que vous devez pratiquer :** Combiner plusieurs concepts
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.employes.find(
+    {service: "IT"},
+    {nom: 1, prenom: 1, age: 1, _id: 0}
+)
+.sort({age: 1})
+.limit(2)
+```
+
+**Explications :**
+- Critères : `service: "IT"`
+- Projection : nom, prenom, age (sans _id)
+- Tri croissant par âge : les plus jeunes d'abord
+- Limite : 2 résultats
+</details>
+
+---
+
+#### ✅ Auto-évaluation
+
+Avant de passer à la suite, vérifiez que vous maîtrisez :
+- [ ] Les opérateurs de comparaison (`$lt`, `$gt`, `$lte`, `$gte`, `$ne`)
+- [ ] La combinaison de critères (AND implicite)
+- [ ] Les projections pour sélectionner des champs
+- [ ] Le tri avec `.sort()`
+- [ ] La limitation avec `.limit()`
+- [ ] Le comptage avec `countDocuments()`
+- [ ] Les valeurs distinctes avec `distinct()`
+- [ ] La vérification d'existence avec `$exists`
+- [ ] Les requêtes dans les tableaux
+
+---
+
+### 3.5 Modifications de documents (15 min)
 
 ```javascript
 // 1. Mise à jour simple
