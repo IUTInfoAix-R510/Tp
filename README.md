@@ -252,6 +252,25 @@ Sharded Cluster (Horizontal scaling)
    
 5. "Finish and Close"
 
+#### ⚠️ Problèmes fréquents lors du déploiement
+
+**Problème 1 : "Region not available"**
+- **Cause :** La région Paris peut être saturée
+- **Solution :** Choisir Frankfurt (eu-central-1) ou Ireland (eu-west-1)
+
+**Problème 2 : "Password doesn't meet requirements"**
+- **Cause :** Le mot de passe doit contenir au moins 8 caractères avec majuscules, minuscules et chiffres
+- **Solution :** Utiliser le générateur automatique et BIEN NOTER le mot de passe dans un fichier texte
+
+**Problème 3 : "IP Address not whitelisted"**
+- **Cause :** Votre IP n'est pas autorisée à se connecter
+- **Solution :** Dans "Network Access", vérifier que 0.0.0.0/0 est bien ajouté (autorisation universelle)
+- **Note :** En production, on ne mettrait JAMAIS 0.0.0.0/0, mais pour l'apprentissage c'est acceptable
+
+**Problème 4 : Le cluster met plus de 5 minutes à démarrer**
+- **Cause :** Serveurs Atlas surchargés
+- **Solution :** Patienter jusqu'à 10 minutes. Si toujours bloqué, supprimer et recréer le cluster
+
 ### 2.3 Installation des outils
 
 #### MongoDB Compass (GUI)
