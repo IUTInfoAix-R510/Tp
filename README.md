@@ -9,9 +9,7 @@
   * Consulter et/ou créer des [issues](https://github.com/IUTInfoAix-R510/Cours/issues).
   * [Email](mailto:sebastien.nedjar@univ-amu.fr) pour une question d'ordre privée, ou pour convenir d'un rendez-vous physique.
 
-## Travaux pratiques R5.Real.10 - Nouveaux paradigmes de base de données
-
-# Séance 1 : Introduction au NoSQL et découverte de MongoDB - Plan détaillé (4h)
+## Travaux pratiques R5.Real.10 - Introduction au NoSQL et découverte de MongoDB (4h)
 
 ## 🎯 Objectifs de la séance
 
@@ -37,17 +35,17 @@ Cette séance pose les fondations pour votre projet fil rouge **SteamCity.io**, 
 
 | Horaire | Durée | Activité |
 |---------|-------|----------|
-| 0h00-0h45 | 45 min | Cours : Du relationnel au NoSQL |
-| 0h45-1h15 | 30 min | Installation et configuration Atlas |
+| 0h00-0h30 | 30 min | Cours : Du relationnel au NoSQL |
+| 0h30-1h15 | 45 min | Installation et configuration Atlas |
 | 1h15-1h25 | 10 min | **Pause** |
-| 1h25-2h25 | 60 min | Découverte pratique MongoDB |
-| 2h25-3h25 | 60 min | CRUD complet guidé |
-| 3h25-3h35 | 10 min | **Pause** |
-| 3h35-4h00 | 25 min | Mini-projet et validation |
+| 1h25-2h20 | 55 min | Découverte pratique MongoDB |
+| 2h20-3h20 | 60 min | CRUD complet guidé |
+| 3h20-3h30 | 10 min | **Pause** |
+| 3h30-4h00 | 30 min | Mini-projet et validation |
 
 ---
 
-## 📚 Phase 1 : Cours théorique - Du relationnel au NoSQL (45 min)
+## 📚 Phase 1 : Cours théorique - Du relationnel au NoSQL (30 min)
 
 ### 1.1 Les limites du modèle relationnel
 
