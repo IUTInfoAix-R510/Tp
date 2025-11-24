@@ -1680,7 +1680,345 @@ db.membres.insertMany([
 ])
 ```
 
-### 4.3 Requêtes métier essentielles
+#### ✅ Point de validation #3
+
+Vérifiez votre compréhension avant de continuer :
+
+**Quiz rapide :**
+1. Quelle est la différence entre un objet imbriqué et un tableau d'objets ?
+2. Pourquoi embarque-t-on les exemplaires dans les livres plutôt que de créer une collection séparée ?
+3. Comment MongoDB sait-il qu'un document appartient à la collection "livres" ?
+
+<details>
+<summary>💡 Réponses</summary>
+
+1. **Objet imbriqué** = 1 seule valeur (ex: `auteur`). **Tableau d'objets** = plusieurs valeurs (ex: `exemplaires`)
+2. Parce qu'on lit souvent un livre avec tous ses exemplaires → une seule requête au lieu de JOIN
+3. Par le nom de la collection : `db.livres.insertMany()` insère dans "livres", `db.membres.insertMany()` dans "membres"
+</details>
+
+**Checklist :**
+- [ ] J'ai compris la différence entre embedding et références
+- [ ] Je sais identifier un objet imbriqué dans un document
+- [ ] Je comprends la structure à 3 niveaux (livre → exemplaire → emprunt)
+- [ ] J'ai inséré les données et vérifié avec `db.livres.countDocuments()`
+
+---
+
+### 4.2 Exercices d'interrogation sur documents imbriqués (20 min)
+
+Maintenant que vous avez des données complexes, apprenons à les interroger efficacement ! Ces exercices vous apprennent la **notation pointée**, essentielle pour travailler avec des documents imbriqués.
+
+#### Exercice 24 : Requête sur un champ imbriqué (objet simple)
+**Objectif :** Trouver tous les livres écrits par un auteur de nationalité "Britannique"
+
+**Ce que vous devez pratiquer :** Notation pointée pour accéder à un champ dans un objet imbriqué
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.livres.find({"auteur.nationalite": "Britannique"})
+```
+
+**Explications :**
+- **Notation pointée** : `"auteur.nationalite"` pour accéder à un champ dans un objet
+- ⚠️ **Les guillemets sont OBLIGATOIRES** autour de `"auteur.nationalite"`
+- Équivalent SQL : `SELECT * FROM livres WHERE auteur_nationalite = 'Britannique'`
+
+**Pour vérifier :**
+```javascript
+// Afficher seulement le titre et l'auteur
+db.livres.find(
+    {"auteur.nationalite": "Britannique"},
+    {titre: 1, auteur: 1, _id: 0}
+)
+```
+</details>
+
+---
+
+#### Exercice 25 : Requête sur un tableau d'objets
+**Objectif :** Trouver tous les livres qui ont **au moins un exemplaire disponible**
+
+**Ce que vous devez pratiquer :** Requête dans un tableau d'objets
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.livres.find({"exemplaires.disponible": true})
+```
+
+**Explications :**
+- MongoDB cherche automatiquement dans **tous les éléments du tableau** `exemplaires`
+- La requête retourne le livre si **au moins un** exemplaire a `disponible: true`
+- Cette requête trouve "Le Petit Prince" même s'il a 2 exemplaires disponibles et 1 emprunté
+
+**Pour afficher uniquement les titres :**
+```javascript
+db.livres.find(
+    {"exemplaires.disponible": true},
+    {titre: 1, _id: 0}
+)
+```
+</details>
+
+---
+
+#### Exercice 26 : Projection avec l'opérateur positionnel $
+**Objectif :** Trouver les livres disponibles, mais afficher SEULEMENT le premier exemplaire disponible (pas tous)
+
+**Ce que vous devez pratiquer :** Utilisation de l'opérateur `$` dans les projections
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.livres.find(
+    {"exemplaires.disponible": true},
+    {titre: 1, "exemplaires.$": 1}
+)
+```
+
+**Explications :**
+- `"exemplaires.$"` = retourne SEULEMENT le **premier élément du tableau qui match** le critère
+- Utile pour éviter de récupérer tous les exemplaires quand on n'en veut qu'un
+- ⚠️ Limitation : on ne peut pas obtenir plusieurs éléments qui matchent, seulement le premier
+
+**Différence :**
+```javascript
+// Sans $ : retourne TOUS les exemplaires
+{titre: 1, exemplaires: 1}
+
+// Avec $ : retourne SEULEMENT le premier qui match
+{titre: 1, "exemplaires.$": 1}
+```
+</details>
+
+---
+
+#### Exercice 27 : Requête sur imbrication à 3 niveaux
+**Objectif :** Trouver tous les livres qui ont un exemplaire emprunté par le membre "M001"
+
+**Ce que vous devez pratiquer :** Notation pointée à 3 niveaux (livre → exemplaire → emprunt)
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.livres.find({"exemplaires.emprunt_actuel.membre_id": "M001"})
+```
+
+**Explications :**
+- Notation pointée à **3 niveaux** : `exemplaires.emprunt_actuel.membre_id`
+- MongoDB parcourt le tableau `exemplaires`, puis cherche dans chaque objet `emprunt_actuel`
+- Retourne les livres où **au moins un exemplaire** est emprunté par M001
+
+**Afficher plus d'informations :**
+```javascript
+db.livres.find(
+    {"exemplaires.emprunt_actuel.membre_id": "M001"},
+    {
+        titre: 1,
+        "exemplaires.$": 1  // Afficher l'exemplaire concerné
+    }
+)
+```
+</details>
+
+---
+
+#### Exercice 28 : Requête avec $in sur un tableau simple
+**Objectif :** Trouver tous les livres de la catégorie "Jeunesse" OU "Fantasy"
+
+**Ce que vous devez pratiquer :** Recherche avec plusieurs valeurs dans un tableau
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.livres.find({categories: {$in: ["Jeunesse", "Fantasy"]}})
+```
+
+**Explications :**
+- `$in` : vérifie si **au moins une** valeur du tableau `categories` est dans la liste fournie
+- Équivalent SQL : `WHERE categories IN ('Jeunesse', 'Fantasy')`
+- ⚠️ Attention : cela retourne les livres qui ont "Jeunesse" **OU** "Fantasy", pas forcément les deux
+
+**Pour trouver les livres qui ont les DEUX catégories :**
+```javascript
+db.livres.find({
+    categories: {$all: ["Jeunesse", "Fantasy"]}
+})
+```
+</details>
+
+---
+
+#### Exercice 29 : Compter les exemplaires d'un livre
+**Objectif :** Combien d'exemplaires possède le livre "Harry Potter à l'école des sorciers" ?
+
+**Ce que vous devez pratiquer :** Projection + manipulation de tableau dans le shell
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+// Méthode 1 : Récupérer et compter manuellement
+let livre = db.livres.findOne({titre: "Harry Potter à l'école des sorciers"})
+print(`Nombre d'exemplaires : ${livre.exemplaires.length}`)
+
+// Méthode 2 : Avec agrégation (plus avancé)
+db.livres.aggregate([
+    {$match: {titre: "Harry Potter à l'école des sorciers"}},
+    {$project: {
+        titre: 1,
+        nombre_exemplaires: {$size: "$exemplaires"}
+    }}
+])
+```
+
+**Explications :**
+- `livre.exemplaires.length` : JavaScript standard pour compter les éléments d'un tableau
+- `$size` dans l'agrégation : compte les éléments d'un tableau côté serveur
+- L'agrégation est plus performante pour de gros volumes
+</details>
+
+---
+
+#### Exercice 30 : Requête avec date (retards)
+**Objectif :** Trouver tous les livres avec des exemplaires dont la date de retour prévue est dépassée (en retard)
+
+**Ce que vous devez pratiquer :** Comparaison de dates avec `$lt`
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+let aujourd_hui = new Date()
+
+db.livres.find({
+    "exemplaires.emprunt_actuel.date_retour_prevue": {$lt: aujourd_hui}
+})
+```
+
+**Explications :**
+- `new Date()` : crée un objet Date avec la date/heure actuelle
+- `$lt: aujourd_hui` : "less than" = inférieur à aujourd'hui = en retard
+- MongoDB compare automatiquement les dates
+
+**Afficher les informations pertinentes :**
+```javascript
+db.livres.find(
+    {"exemplaires.emprunt_actuel.date_retour_prevue": {$lt: new Date()}},
+    {
+        titre: 1,
+        "exemplaires.emprunt_actuel": 1
+    }
+)
+```
+
+**Conseil :** En production, on créerait un index sur `exemplaires.emprunt_actuel.date_retour_prevue` pour accélérer cette requête fréquente.
+</details>
+
+---
+
+#### Exercice 31 : Requête complexe combinée
+**Objectif :** Trouver les livres de "Fantasy" avec une note supérieure à 4.5, publiés après 1990, triés par popularité
+
+**Ce que vous devez pratiquer :** Combiner plusieurs critères avec notation pointée, tri et projection
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.livres.find(
+    {
+        categories: "Fantasy",
+        note_moyenne: {$gt: 4.5},
+        "publication.annee": {$gt: 1990}
+    },
+    {
+        titre: 1,
+        auteur: 1,
+        note_moyenne: 1,
+        nombre_emprunts_total: 1,
+        _id: 0
+    }
+).sort({nombre_emprunts_total: -1})
+```
+
+**Explications :**
+- Combinaison de 3 critères (AND implicite)
+- `categories: "Fantasy"` : recherche dans le tableau
+- `"publication.annee": {$gt: 1990}` : notation pointée sur objet imbriqué
+- `sort({nombre_emprunts_total: -1})` : tri décroissant (les plus populaires d'abord)
+
+**Résultat attendu :** Harry Potter (4.9, 234 emprunts)
+</details>
+
+---
+
+#### 🎯 Exercice bonus : Recherche textuelle avec $regex
+**Objectif :** Trouver tous les livres dont le titre contient "Harry" (insensible à la casse)
+
+**Ce que vous devez pratiquer :** Recherche avec expressions régulières
+
+<details>
+<summary>💡 Solution</summary>
+
+```javascript
+db.livres.find({
+    titre: {$regex: /Harry/i}  // i = insensible à la casse
+})
+
+// Ou avec une chaîne :
+db.livres.find({
+    titre: {$regex: "Harry", $options: "i"}
+})
+```
+
+**Explications :**
+- `$regex` : permet des recherches avec expressions régulières
+- `/Harry/i` : le `i` rend la recherche insensible à la casse (HARRY = harry = Harry)
+- Plus lent qu'une recherche exacte, mais plus flexible
+
+**Pour une recherche plus performante :**
+```javascript
+// Créer un index textuel
+db.livres.createIndex({titre: "text"})
+
+// Recherche textuelle optimisée
+db.livres.find({$text: {$search: "Harry"}})
+```
+</details>
+
+---
+
+#### ✅ Auto-évaluation
+
+Avant de passer à la suite, vérifiez que vous maîtrisez :
+- [ ] La notation pointée pour objets imbriqués (`"auteur.nom"`)
+- [ ] La notation pointée pour tableaux d'objets (`"exemplaires.disponible"`)
+- [ ] L'opérateur positionnel `$` dans les projections
+- [ ] La notation pointée à 3 niveaux (`"a.b.c"`)
+- [ ] L'opérateur `$in` pour chercher dans les tableaux
+- [ ] La comparaison de dates avec `$lt`, `$gt`
+- [ ] La combinaison de plusieurs critères sur documents complexes
+
+⚠️ **Erreur fréquente à éviter :**
+```javascript
+// ❌ FAUX - provoque une erreur
+db.livres.find({auteur.nom: "Orwell"})
+
+// ✅ CORRECT - guillemets obligatoires
+db.livres.find({"auteur.nom": "Orwell"})
+```
+
+---
+
+### 4.3 Exercices de modification sur documents complexes (20 min)
 
 ```javascript
 // 1. Livres disponibles
